@@ -7,6 +7,7 @@ import icon from '../../resources/icon.png?asset'
 let mainWindow: BrowserWindow
 let tray: Tray | null = null
 let isQuitting = false
+let isGhostMode = false
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -56,7 +57,6 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  // Phase 2 IPC: Handle Minimize and Dynamic Close Actions
   ipcMain.on('minimize-app', () => {
     if (mainWindow) mainWindow.minimize()
   })
@@ -70,12 +70,31 @@ app.whenReady().then(() => {
     }
   })
 
+  // Handle Ghost Mode from React Settings
+  ipcMain.on('set-ghost-mode', (_, enable) => {
+    isGhostMode = enable
+    if (mainWindow) {
+      mainWindow.setIgnoreMouseEvents(enable)
+      mainWindow.setOpacity(enable ? 0.3 : 1.0)
+    }
+  })
+
   globalShortcut.register('CommandOrControl+Shift+C', () => {
     if (mainWindow.isVisible()) {
       mainWindow.hide()
     } else {
       mainWindow.show()
       mainWindow.focus()
+    }
+  })
+
+  // Global Hotkey to Toggle Ghost Mode Safely
+  globalShortcut.register('CommandOrControl+Shift+G', () => {
+    isGhostMode = !isGhostMode
+    if (mainWindow) {
+      mainWindow.setIgnoreMouseEvents(isGhostMode)
+      mainWindow.setOpacity(isGhostMode ? 0.3 : 1.0)
+      mainWindow.webContents.send('ghost-mode-toggled', isGhostMode)
     }
   })
 

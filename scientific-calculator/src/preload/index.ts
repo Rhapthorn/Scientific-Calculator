@@ -4,8 +4,12 @@ import {electronAPI} from '@electron-toolkit/preload'
 
 const api = {
   minimizeApp: () => ipcRenderer.send('minimize-app'),
-  // Phase 2: Accept the user's setting to determine the close behavior
-  closeApp: (action: 'hide' | 'quit') => ipcRenderer.send('close-app', action)
+  closeApp: (action: 'hide' | 'quit') => ipcRenderer.send('close-app', action),
+  setGhostMode: (enable: boolean) => ipcRenderer.send('set-ghost-mode', enable),
+  onGhostModeToggled: (callback: (enabled: boolean) => void) => {
+    ipcRenderer.removeAllListeners('ghost-mode-toggled')
+    ipcRenderer.on('ghost-mode-toggled', (_, enable) => callback(enable))
+  }
 }
 
 if (process.contextIsolated) {
@@ -16,8 +20,8 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore (define in dts)
+  // @ts-ignore
   window.electron = electronAPI
-  // @ts-ignore (define in dts)
+  // @ts-ignore
   window.api = api
 }

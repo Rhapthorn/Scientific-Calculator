@@ -7,6 +7,8 @@ declare global {
     api: {
       minimizeApp: () => void
       closeApp: (action: 'hide' | 'quit') => void
+      setGhostMode: (enable: boolean) => void
+      onGhostModeToggled: (callback: (enabled: boolean) => void) => void
     }
   }
 }
@@ -17,6 +19,7 @@ interface AppSettings {
   theme: 'slate' | 'neon' | 'monochrome'
   sound: boolean
   onClose: 'hide' | 'quit'
+  ghostMode: boolean
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -24,7 +27,28 @@ const DEFAULT_SETTINGS: AppSettings = {
   precision: 'auto',
   theme: 'slate',
   sound: true,
-  onClose: 'hide'
+  onClose: 'hide',
+  ghostMode: false
+}
+
+const HighlightedExpression = ({expression}: { expression: string }) => {
+  if (!expression) return <div className="expression">&nbsp;</div>
+
+  const tokens = expression.match(/([a-zA-Z]+)|([0-9.]+)|([\+\-\*\/\^\%])|([()])|(\s+)/g) || []
+
+  return (
+    <div className="expression">
+      {tokens.map((token, i) => {
+        let className = 'token-default'
+        if (/^[a-zA-Z]+$/.test(token)) className = 'token-func-text'
+        else if (/^[0-9.]+$/.test(token)) className = 'token-num-text'
+        else if (/^[\+\-\*\/\^\%]$/.test(token)) className = 'token-op-text'
+        else if (/^[()]$/.test(token)) className = 'token-paren-text'
+
+        return <span key={i} className={className}>{token}</span>
+      })}
+    </div>
+  )
 }
 
 export default function App() {
@@ -37,9 +61,22 @@ export default function App() {
     return saved ? {...DEFAULT_SETTINGS, ...JSON.parse(saved)} : DEFAULT_SETTINGS
   })
 
+  // Sync settings to localStorage
   useEffect(() => {
     localStorage.setItem('calc-settings', JSON.stringify(settings))
   }, [settings])
+
+  // Sync Ghost Mode explicitly to the Main Process
+  useEffect(() => {
+    window.api.setGhostMode(settings.ghostMode)
+  }, [settings.ghostMode])
+
+  // Listen for Ghost Mode changes triggered by the Ctrl+Shift+G global hotkey
+  useEffect(() => {
+    window.api.onGhostModeToggled((enabled) => {
+      setSettings((prev) => ({...prev, ghostMode: enabled}))
+    })
+  }, [])
 
   const playClick = useCallback(() => {
     if (!settings.sound) return
@@ -170,7 +207,6 @@ export default function App() {
   }, [handleInput, calculate, handlePercentage, deleteLast, clear, isSettingsOpen])
 
   const handleMinimize = () => window.api.minimizeApp()
-  // Phase 2: Send the specific user preference to the OS
   const handleClose = () => window.api.closeApp(settings.onClose)
 
   const themeClasses = `theme-${settings.theme}`
@@ -264,7 +300,6 @@ export default function App() {
           transition: color 0.2s ease, transform 0.3s ease;
         }
         .gear-btn:hover { color: var(--text-main); transform: rotate(45deg); }
-        /* Explicit Red Hover Override for Mono Theme */
         .theme-monochrome .gear-btn:hover { color: #e81123; }
 
         .window-controls { display: flex; -webkit-app-region: no-drag; }
@@ -286,7 +321,13 @@ export default function App() {
           backdrop-filter: blur(8px);
           color: var(--text-main);
         }
-        .expression { color: var(--text-muted); font-size: 1rem; min-height: 1.2rem; }
+
+        .expression { font-size: 1.1rem; min-height: 1.3rem; margin-bottom: 0.25rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+        .token-default { color: var(--text-muted); }
+        .token-func-text { color: var(--btn-primary); }
+        .token-num-text { color: var(--text-main); }
+        .token-op-text { color: var(--btn-danger); }
+        .token-paren-text { color: var(--btn-operator); }
 
         .result {
           font-size: 2.25rem;
@@ -367,7 +408,6 @@ export default function App() {
 
       <div className={`settings-overlay ${isSettingsOpen ? 'open' : ''}`}>
         <div className="settings-header">Preferences</div>
-
         <div className="setting-group">
           <span className="setting-label">Angle Unit</span>
           <div className="setting-controls">
@@ -379,7 +419,6 @@ export default function App() {
             </button>
           </div>
         </div>
-
         <div className="setting-group">
           <span className="setting-label">Decimals</span>
           <div className="setting-controls">
@@ -397,7 +436,6 @@ export default function App() {
             </button>
           </div>
         </div>
-
         <div className="setting-group">
           <span className="setting-label">Theme</span>
           <div className="setting-controls">
@@ -412,7 +450,6 @@ export default function App() {
             </button>
           </div>
         </div>
-
         <div className="setting-group">
           <span className="setting-label">System</span>
           <div className="setting-controls">
@@ -425,11 +462,26 @@ export default function App() {
             </button>
           </div>
         </div>
+        <div className="setting-group" style={{marginTop: '0.5rem'}}>
+          <span className="setting-label">Ghost Mode</span>
+          <div className="setting-controls">
+            <button
+              className={`toggle-btn ${settings.ghostMode ? 'active' : ''}`}
+              onClick={() => setSettings({...settings, ghostMode: !settings.ghostMode})}
+              style={{padding: '0.75rem'}}
+            >
+              Ghost Mode {settings.ghostMode ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          <span style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem', textAlign: 'center'}}>
+            Warning: Unclickable when ON. Use <strong>Ctrl+Shift+G</strong> to toggle globally.
+          </span>
+        </div>
       </div>
 
       <div className="calculator-container" onClick={() => isSettingsOpen && setIsSettingsOpen(false)}>
         <div className="display">
-          <div className="expression">{expression || '\u00A0'}</div>
+          <HighlightedExpression expression={expression}/>
           <div className="result">{result}</div>
         </div>
         <div className="keypad">
