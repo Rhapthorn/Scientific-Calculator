@@ -1,7 +1,7 @@
 // src/main/index.ts
-import {app, shell, BrowserWindow, globalShortcut, Tray, Menu, nativeImage, ipcMain} from 'electron'
+import {app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray} from 'electron'
 import {join} from 'path'
-import {electronApp, optimizer, is} from '@electron-toolkit/utils'
+import {electronApp, is, optimizer} from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 let mainWindow: BrowserWindow
