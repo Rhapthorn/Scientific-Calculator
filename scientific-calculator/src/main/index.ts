@@ -119,7 +119,7 @@ app.whenReady().then(() => {
     }
   ])
 
-  tray.setToolTip('Scientific Calculator')
+  tray.setToolTip('Matrix Calculator')
   tray.setContextMenu(contextMenu)
 
   tray.on('double-click', () => {

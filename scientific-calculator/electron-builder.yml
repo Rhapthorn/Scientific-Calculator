@@ -1,5 +1,5 @@
 appId: com.manos.scientificcalculator
-productName: Scientific Calculator
+productName: Matrix Calculator
 directories:
   buildResources: build
 files:
@@ -9,13 +9,10 @@ files:
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
 win:
-  executableName: ScientificCalculator
+  icon: build/icon.ico
   target:
-    - target: nsis
-      arch:
-        - x64
+    - nsis
+
 nsis:
-  oneClick: true
-  perMachine: false
-  allowToChangeInstallationDirectory: false
-  deleteAppDataOnUninstall: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico

@@ -20,6 +20,7 @@ interface AppSettings {
   sound: boolean
   onClose: 'hide' | 'quit'
   ghostMode: boolean
+  calcMode: 'scientific' | 'programmer'
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -28,7 +29,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'slate',
   sound: true,
   onClose: 'hide',
-  ghostMode: false
+  ghostMode: false,
+  calcMode: 'scientific'
 }
 
 const HighlightedExpression = ({expression}: { expression: string }) => {
@@ -61,17 +63,14 @@ export default function App() {
     return saved ? {...DEFAULT_SETTINGS, ...JSON.parse(saved)} : DEFAULT_SETTINGS
   })
 
-  // Sync settings to localStorage
   useEffect(() => {
     localStorage.setItem('calc-settings', JSON.stringify(settings))
   }, [settings])
 
-  // Sync Ghost Mode explicitly to the Main Process
   useEffect(() => {
     window.api.setGhostMode(settings.ghostMode)
   }, [settings.ghostMode])
 
-  // Listen for Ghost Mode changes triggered by the Ctrl+Shift+G global hotkey
   useEffect(() => {
     window.api.onGhostModeToggled((enabled) => {
       setSettings((prev) => ({...prev, ghostMode: enabled}))
@@ -209,6 +208,23 @@ export default function App() {
   const handleMinimize = () => window.api.minimizeApp()
   const handleClose = () => window.api.closeApp(settings.onClose)
 
+  const programmerBases = useMemo(() => {
+    if (result === 'Error' || result === '0' || !result) return {hex: '0', dec: '0', oct: '0', bin: '0'}
+    try {
+      const cleanResult = result.replace(/,/g, '')
+      const num = Math.trunc(Number(cleanResult))
+      if (isNaN(num)) return {hex: '0', dec: '0', oct: '0', bin: '0'}
+      return {
+        hex: (num >>> 0).toString(16).toUpperCase(),
+        dec: num.toString(10),
+        oct: (num >>> 0).toString(8),
+        bin: (num >>> 0).toString(2)
+      }
+    } catch {
+      return {hex: '0', dec: '0', oct: '0', bin: '0'}
+    }
+  }, [result])
+
   const themeClasses = `theme-${settings.theme}`
 
   return (
@@ -320,6 +336,7 @@ export default function App() {
           margin-bottom: 0.75rem; display: flex; flex-direction: column; align-items: flex-end;
           backdrop-filter: blur(8px);
           color: var(--text-main);
+          flex-shrink: 0;
         }
 
         .expression { font-size: 1.1rem; min-height: 1.3rem; margin-bottom: 0.25rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
@@ -335,7 +352,28 @@ export default function App() {
           width: 100%;
           text-align: right;
           color: var(--result-text);
+          transition: font-size 0.2s ease;
         }
+
+        .result.programmer {
+          font-size: 1.6rem;
+        }
+
+        .bases-container {
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          gap: 0.15rem;
+          margin-top: 0.5rem;
+          padding-top: 0.5rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .base-row { display: flex; justify-content: flex-start; gap: 1rem; }
+        .base-label { width: 24px; font-weight: bold; color: var(--btn-primary); }
+        .base-value { color: var(--text-main); }
 
         .keypad {
           display: grid; gap: 0.35rem; flex-grow: 1; -webkit-app-region: no-drag;
@@ -362,17 +400,38 @@ export default function App() {
         .danger { background-color: var(--btn-danger); color: #111; font-weight: 700; }
         .primary { background-color: var(--btn-primary); color: #111; font-weight: 700; }
 
+        /* Updated Overlay: Tighter padding + Custom Scrollbar */
         .settings-overlay {
           position: absolute; top: 32px; left: 0; right: 0; bottom: 0;
           background-color: var(--settings-bg); backdrop-filter: blur(12px);
-          z-index: 50; display: flex; flex-direction: column; padding: 1.5rem;
+          z-index: 50; display: flex; flex-direction: column;
+          padding: 1rem 1.25rem; /* Tighter padding pulls content higher */
+          overflow-y: auto; /* Dynamic native scrollbar if needed */
           transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
         }
         .settings-overlay.open { transform: translateY(0); }
 
-        .settings-header { font-size: 1.2rem; font-weight: 600; margin-bottom: 1.5rem; color: var(--text-main); }
-        .setting-group { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .settings-overlay::-webkit-scrollbar { width: 6px; }
+        .settings-overlay::-webkit-scrollbar-track { background: transparent; }
+        .settings-overlay::-webkit-scrollbar-thumb { background: var(--btn-func); border-radius: 6px; }
+        .settings-overlay::-webkit-scrollbar-thumb:hover { background: var(--btn-func-hover); }
+
+        .settings-header {
+          font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-main);
+          display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+        }
+
+        .close-settings-btn {
+          background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+          display: flex; align-items: center; justify-content: center; padding: 0.25rem;
+          transition: color 0.2s ease, transform 0.2s ease;
+        }
+        .close-settings-btn:hover {
+          color: var(--btn-danger); transform: scale(1.1);
+        }
+
+        .setting-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
         .setting-label { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
         .setting-controls { display: flex; gap: 0.5rem; }
 
@@ -407,7 +466,27 @@ export default function App() {
       </div>
 
       <div className={`settings-overlay ${isSettingsOpen ? 'open' : ''}`}>
-        <div className="settings-header">Preferences</div>
+        <div className="settings-header">
+          <span>Preferences</span>
+          <button className="close-settings-btn" onClick={() => setIsSettingsOpen(false)}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"
+                 strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 1L13 13M13 1L1 13"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="setting-group">
+          <span className="setting-label">Calculator Mode</span>
+          <div className="setting-controls">
+            <button className={`toggle-btn ${settings.calcMode === 'scientific' ? 'active' : ''}`}
+                    onClick={() => setSettings({...settings, calcMode: 'scientific'})}>Scientific
+            </button>
+            <button className={`toggle-btn ${settings.calcMode === 'programmer' ? 'active' : ''}`}
+                    onClick={() => setSettings({...settings, calcMode: 'programmer'})}>Programmer
+            </button>
+          </div>
+        </div>
         <div className="setting-group">
           <span className="setting-label">Angle Unit</span>
           <div className="setting-controls">
@@ -462,27 +541,37 @@ export default function App() {
             </button>
           </div>
         </div>
-        <div className="setting-group" style={{marginTop: '0.5rem'}}>
-          <span className="setting-label">Ghost Mode</span>
-          <div className="setting-controls">
-            <button
-              className={`toggle-btn ${settings.ghostMode ? 'active' : ''}`}
-              onClick={() => setSettings({...settings, ghostMode: !settings.ghostMode})}
-              style={{padding: '0.75rem'}}
-            >
-              Ghost Mode {settings.ghostMode ? 'ON' : 'OFF'}
-            </button>
-          </div>
-          <span style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem', textAlign: 'center'}}>
-            Warning: Unclickable when ON. Use <strong>Ctrl+Shift+G</strong> to toggle globally.
-          </span>
+
+        <div style={{
+          marginTop: 'auto',
+          paddingTop: '1rem',
+          paddingBottom: '0.5rem',
+          textAlign: 'center',
+          fontSize: '0.75rem',
+          color: 'var(--text-muted)',
+          flexShrink: 0
+        }}>
+          Ghost Mode (Click-Through): <strong>Ctrl+Shift+G</strong>
         </div>
       </div>
 
       <div className="calculator-container" onClick={() => isSettingsOpen && setIsSettingsOpen(false)}>
         <div className="display">
           <HighlightedExpression expression={expression}/>
-          <div className="result">{result}</div>
+          <div className={`result ${settings.calcMode === 'programmer' ? 'programmer' : ''}`}>{result}</div>
+
+          {settings.calcMode === 'programmer' && (
+            <div className="bases-container">
+              <div className="base-row"><span className="base-label">HEX</span><span
+                className="base-value">{programmerBases.hex}</span></div>
+              <div className="base-row"><span className="base-label">DEC</span><span
+                className="base-value">{programmerBases.dec}</span></div>
+              <div className="base-row"><span className="base-label">OCT</span><span
+                className="base-value">{programmerBases.oct}</span></div>
+              <div className="base-row"><span className="base-label">BIN</span><span
+                className="base-value">{programmerBases.bin}</span></div>
+            </div>
+          )}
         </div>
         <div className="keypad">
           <button onClick={() => handleInput('sin(')} className="btn func" style={{gridArea: 'sin'}}>sin</button>
