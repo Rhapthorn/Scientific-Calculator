@@ -476,6 +476,7 @@ export default function App() {
           </button>
         </div>
 
+
         <div className="setting-group">
           <span className="setting-label">Calculator Mode</span>
           <div className="setting-controls">
@@ -552,8 +553,14 @@ export default function App() {
           flexShrink: 0
         }}>
           Ghost Mode (Click-Through): <strong>Ctrl+Shift+G</strong>
+
+          <div className="settings-footer" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', color: 'var(--text-muted)' }}>
+            <span style={{ fontWeight: 'bold' }}>v{__APP_VERSION__}</span>
+          </div>
+
         </div>
       </div>
+
 
       <div className="calculator-container" onClick={() => isSettingsOpen && setIsSettingsOpen(false)}>
         <div className="display">
@@ -612,3 +619,4 @@ export default function App() {
     </div>
   )
 }
+

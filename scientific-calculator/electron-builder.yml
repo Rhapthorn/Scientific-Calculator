@@ -21,4 +21,10 @@ win:
 nsis:
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Matrix Calculator"
 
