@@ -2,6 +2,7 @@ appId: com.manos.scientificcalculator
 productName: Matrix Calculator
 directories:
   buildResources: build
+compression: maximum
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -20,4 +21,4 @@ win:
 nsis:
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
-  compression: maximum
+
