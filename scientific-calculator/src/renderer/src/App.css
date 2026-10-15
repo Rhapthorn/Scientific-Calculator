@@ -139,3 +139,33 @@ body {
 .action-wide {
   grid-column: span 2;
 }
+
+/* src/renderer/src/index.css */
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Force tactile push-down effect on your specific UI buttons */
+.key-btn:active,
+.mode-btn:active,
+.icon-btn:active,
+button:active {
+  transform: scale(0.96) !important;
+  transition: transform 0.05s ease !important;
+}
