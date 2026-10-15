@@ -14,17 +14,14 @@ files:
   - '!**/node_modules/*.d.ts'
   - '!**/*.map'
 win:
-  icon: build/icon.ico
+  icon: build/icon.png
   target:
     - nsis
 
 nsis:
-  installerIcon: build/icon.ico
-  uninstallerIcon: build/icon.ico
   oneClick: false
   perMachine: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: "Matrix Calculator"
-

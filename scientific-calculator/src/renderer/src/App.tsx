@@ -21,6 +21,7 @@ interface AppSettings {
   onClose: 'hide' | 'quit'
   ghostMode: boolean
   calcMode: 'scientific' | 'programmer'
+  colorMode: 'dark' | 'light'
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -30,7 +31,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   sound: true,
   onClose: 'hide',
   ghostMode: false,
-  calcMode: 'scientific'
+  calcMode: 'scientific',
+  colorMode: 'dark'
 }
 
 const HighlightedExpression = ({expression}: { expression: string }) => {
@@ -66,6 +68,13 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('calc-settings', JSON.stringify(settings))
   }, [settings])
+
+  useEffect(() => {
+    // Send the saved color mode to Electron's main process
+    if (window.electron) {
+      window.electron.ipcRenderer.send('set-color-mode', settings.colorMode)
+    }
+  }, [settings.colorMode])
 
   useEffect(() => {
     window.api.setGhostMode(settings.ghostMode)
@@ -540,6 +549,20 @@ export default function App() {
                     onClick={() => setSettings({...settings, onClose: settings.onClose === 'hide' ? 'quit' : 'hide'})}>
               {settings.onClose === 'hide' ? 'Tray Mode' : 'Quit on X'}
             </button>
+
+            <button
+              className="toggle-btn"
+              style={{
+                backgroundColor: settings.colorMode === 'dark' ? 'rgba(255, 204, 0, 0.1)' : 'rgba(100, 150, 255, 0.15)',
+                borderColor: settings.colorMode === 'dark' ? 'rgba(255, 204, 0, 0.6)' : 'rgba(100, 150, 255, 0.6)',
+                color: settings.colorMode === 'dark' ? '#ffcc00' : '#0055ff',
+                fontWeight: 600,
+                transition: 'all 0.3s ease'
+              }}
+              onClick={() => setSettings({...settings, colorMode: settings.colorMode === 'dark' ? 'light' : 'dark'})}
+            >
+              {settings.colorMode === 'dark' ? '☀️ Switch to Light' : '🌙 Switch to Dark'}
+            </button>
           </div>
         </div>
 
@@ -554,8 +577,13 @@ export default function App() {
         }}>
           Ghost Mode (Click-Through): <strong>Ctrl+Shift+G</strong>
 
-          <div className="settings-footer" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', color: 'var(--text-muted)' }}>
-            <span style={{ fontWeight: 'bold' }}>v{__APP_VERSION__}</span>
+          <div className="settings-footer" style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginTop: '1rem',
+            color: 'var(--text-muted)'
+          }}>
+            <span style={{fontWeight: 'bold'}}>v{__APP_VERSION__}</span>
           </div>
 
         </div>

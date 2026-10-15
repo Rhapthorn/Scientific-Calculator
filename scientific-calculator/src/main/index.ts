@@ -1,7 +1,7 @@
 // src/main/index.ts
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
-import { join } from 'path'
-import { electronApp, is, optimizer } from '@electron-toolkit/utils'
+import {app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray, nativeTheme} from 'electron'
+import {join} from 'path'
+import {electronApp, is, optimizer} from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 let mainWindow: BrowserWindow
@@ -13,10 +13,8 @@ let isGhostMode = false
 const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
-  // If another instance of the app is already running, quit this second process immediately
   app.quit()
 } else {
-  // If the user tries to run a second instance, focus the existing window instead
   app.on('second-instance', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
@@ -35,7 +33,7 @@ if (!gotTheLock) {
       show: false,
       frame: false,
       backgroundMaterial: 'mica',
-      ...(process.platform === 'linux' ? { icon } : {}),
+      ...(process.platform === 'linux' ? {icon} : {}),
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: false
@@ -55,7 +53,7 @@ if (!gotTheLock) {
 
     mainWindow.webContents.setWindowOpenHandler((details) => {
       shell.openExternal(details.url)
-      return { action: 'deny' }
+      return {action: 'deny'}
     })
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -86,7 +84,11 @@ if (!gotTheLock) {
       }
     })
 
-    // Handle Ghost Mode from React Settings
+    // Listen for the saved theme mode from React and apply it
+    ipcMain.on('set-color-mode', (_, mode) => {
+      nativeTheme.themeSource = mode
+    })
+
     ipcMain.on('set-ghost-mode', (_, enable) => {
       isGhostMode = enable
       if (mainWindow) {
@@ -104,7 +106,6 @@ if (!gotTheLock) {
       }
     })
 
-    // Global Hotkey to Toggle Ghost Mode Safely
     globalShortcut.register('CommandOrControl+Shift+G', () => {
       isGhostMode = !isGhostMode
       if (mainWindow) {
@@ -115,7 +116,7 @@ if (!gotTheLock) {
     })
 
     const iconPath = join(__dirname, '../../resources/icon.png')
-    const trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+    const trayIcon = nativeImage.createFromPath(iconPath).resize({width: 16, height: 16})
     tray = new Tray(trayIcon)
 
     const contextMenu = Menu.buildFromTemplate([
@@ -126,7 +127,14 @@ if (!gotTheLock) {
           mainWindow.focus()
         }
       },
-      { type: 'separator' },
+      {
+        label: 'Toggle Light / Dark Mode',
+        click: () => {
+          // Instantly flips the OS-level theme for this window
+          nativeTheme.themeSource = nativeTheme.shouldUseDarkColors ? 'light' : 'dark'
+        }
+      },
+      {type: 'separator'},
       {
         label: 'Quit Calculator',
         click: () => {

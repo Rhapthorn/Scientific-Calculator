@@ -169,3 +169,98 @@ button:active {
   transform: scale(0.96) !important;
   transition: transform 0.05s ease !important;
 }
+
+
+/* Fix Top Bar Icon Visibility & Contrast across Slate / Neon themes */
+
+/* Give top buttons a subtle semi-dark background for crisp contrast */
+.app-header button,
+.titlebar button,
+.icon-btn,
+.window-control {
+  color: #ffffff !important;
+  background-color: rgba(18, 18, 24, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(8px);
+  border-radius: 6px;
+  transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+/* Clear, high-contrast hover state */
+.app-header button:hover,
+.titlebar button:hover,
+.icon-btn:hover,
+.window-control:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  color: #ffffff !important;
+}
+
+/* Red hover state specifically for the Close (X) button */
+.close-btn:hover,
+.window-control-close:hover {
+  background-color: #e81123 !important;
+  border-color: #e81123 !important;
+  color: #ffffff !important;
+}
+
+/* Apply a protective dark gradient strictly to the Electron draggable title bar area */
+[-webkit-app-region="drag"] {
+  background: linear-gradient(to bottom, rgba(18, 18, 24, 0.75) 0%, rgba(18, 18, 24, 0) 100%) !important;
+}
+
+/* Ensure the buttons themselves (which are non-draggable) have high contrast SVGs */
+[-webkit-app-region="no-drag"] svg {
+  filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.8)) !important;
+}
+
+/* Force a solid dark background pill directly on the header icons (Gear, Min, Close) */
+header button,
+.app-header button,
+[class*="header"] button,
+[class*="title"] button,
+[class*="window"] button {
+  background-color: rgba(20, 20, 28, 0.95) !important; /* Solid dark grey/blue pill */
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(10px) !important;
+  color: white !important; /* Forces the SVG/Icon inside to be white */
+}
+
+/* Hover effect for the new backgrounds */
+header button:hover,
+.app-header button:hover,
+[class*="header"] button:hover,
+[class*="title"] button:hover,
+[class*="window"] button:hover {
+  background-color: rgba(45, 45, 55, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Automatically adapt text colors when Electron switches to Light Mode */
+@media (prefers-color-scheme: light) {
+  body,
+  .app-container,
+  .main-content,
+  [class*="text"],
+  span, h1, h2, h3, div {
+    color: #121212 !important; /* Force text to dark grey/black */
+  }
+
+  input, select, .result-output, .expression-input {
+    color: #000000 !important;
+  }
+
+  /* Make buttons lighter with dark text */
+  .key-btn, .mode-btn {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    color: #121212 !important;
+  }
+
+  .key-btn:hover, .mode-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+  }
+}
