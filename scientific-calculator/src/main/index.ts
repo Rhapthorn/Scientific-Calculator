@@ -89,6 +89,14 @@ if (!gotTheLock) {
       nativeTheme.themeSource = mode
     })
 
+    ipcMain.on('resize-window', (event, width) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (win) {
+        const bounds = win.getBounds()
+        win.setBounds({ x: bounds.x, y: bounds.y, width: width, height: bounds.height }, true)
+      }
+    })
+
     ipcMain.on('set-ghost-mode', (_, enable) => {
       isGhostMode = enable
       if (mainWindow) {
