@@ -46,7 +46,7 @@ export default function MatrixPanel({colorMode: _colorMode}: MatrixPanelProps) {
     }
   }
 
-  const performOperation = (operation: 'add' | 'subtract' | 'multiply' | 'detA' | 'detB') => {
+  const performOperation = (operation: 'add' | 'subtract' | 'multiply' | 'detA' | 'detB' | 'transposeA' | 'invA') => {
     setError('')
     setResultMatrix(null)
     setResultScalar(null)
@@ -62,9 +62,13 @@ export default function MatrixPanel({colorMode: _colorMode}: MatrixPanelProps) {
         setResultScalar(math.det(matrixA))
       } else if (operation === 'detB') {
         setResultScalar(math.det(matrixB))
+      } else if (operation === 'transposeA') {
+        setResultMatrix(math.transpose(matrixA) as MatrixData)
+      } else if (operation === 'invA') {
+        setResultMatrix(math.inv(matrixA) as MatrixData)
       }
     } catch (err) {
-      setError('Invalid matrix operation')
+      setError('Invalid matrix operation (e.g., matrix might not be invertible)')
     }
   }
 
@@ -290,6 +294,8 @@ export default function MatrixPanel({colorMode: _colorMode}: MatrixPanelProps) {
         <button className="op-btn" onClick={() => performOperation('multiply')}>A × B</button>
         <button className="op-btn" onClick={() => performOperation('detA')}>Det(A)</button>
         <button className="op-btn" onClick={() => performOperation('detB')}>Det(B)</button>
+        <button className="op-btn" onClick={() => performOperation('transposeA')}>Aᵀ</button>
+        <button className="op-btn" onClick={() => performOperation('invA')}>A⁻¹</button>
       </div>
 
       <div className="matrix-result-area">
