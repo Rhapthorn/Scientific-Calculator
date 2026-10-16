@@ -1,6 +1,6 @@
 {
   "name": "matrix-calculator",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "author": "example.com",
@@ -23,7 +23,9 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "mathjs": "^15.2.0"
+    "mafs": "^0.21.0",
+    "mathjs": "^15.2.0",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
@@ -47,4 +49,3 @@
     "vite": "^7.2.6"
   }
 }
-

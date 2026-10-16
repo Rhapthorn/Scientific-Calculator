@@ -1,6 +1,7 @@
 // src/renderer/src/App.tsx
 import {useCallback, useEffect, useMemo, useState} from 'react'
 import * as math from 'mathjs'
+import GraphDisplay from './components/GraphDisplay'
 
 declare global {
   interface Window {
@@ -10,17 +11,18 @@ declare global {
       setGhostMode: (enable: boolean) => void
       onGhostModeToggled: (callback: (enabled: boolean) => void) => void
     }
+    electron: any
   }
 }
 
 interface AppSettings {
   angle: 'deg' | 'rad'
   precision: 'auto' | 2 | 4 | 8
-  theme: 'slate' | 'neon' | 'monochrome'
+  theme: 'slate' | 'neon'
   sound: boolean
   onClose: 'hide' | 'quit'
   ghostMode: boolean
-  calcMode: 'scientific' | 'programmer'
+  calcMode: 'scientific' | 'programmer' | 'graphing'
   colorMode: 'dark' | 'light'
 }
 
@@ -70,13 +72,6 @@ export default function App() {
   }, [settings])
 
   useEffect(() => {
-    // Send the saved color mode to Electron's main process
-    if (window.electron) {
-      window.electron.ipcRenderer.send('set-color-mode', settings.colorMode)
-    }
-  }, [settings.colorMode])
-
-  useEffect(() => {
     window.api.setGhostMode(settings.ghostMode)
   }, [settings.ghostMode])
 
@@ -85,6 +80,20 @@ export default function App() {
       setSettings((prev) => ({...prev, ghostMode: enabled}))
     })
   }, [])
+
+  useEffect(() => {
+    if (window.electron) {
+      window.electron.ipcRenderer.send('set-color-mode', settings.colorMode)
+    }
+  }, [settings.colorMode])
+
+  // NEW: Triggers window resize when graphing mode is toggled
+  useEffect(() => {
+    if (window.electron) {
+      const newWidth = settings.calcMode === 'graphing' ? 800 : 360
+      window.electron.ipcRenderer.send('resize-window', newWidth)
+    }
+  }, [settings.calcMode])
 
   const playClick = useCallback(() => {
     if (!settings.sound) return
@@ -147,6 +156,8 @@ export default function App() {
 
   const calculate = useCallback((): void => {
     playClick()
+    if (settings.calcMode === 'graphing') return
+
     try {
       if (!expression) {
         setResult('0')
@@ -157,11 +168,12 @@ export default function App() {
     } catch {
       setResult('Error')
     }
-  }, [expression, mathScope, formatResult, playClick])
+  }, [expression, mathScope, formatResult, playClick, settings.calcMode])
 
   const handlePercentage = useCallback((): void => {
     playClick()
-    if (!expression) return
+    if (settings.calcMode === 'graphing' || !expression) return
+
     try {
       const match = expression.match(/^(.*?)([\+\-\*\/])([0-9.]+)$/)
       let finalValue = 0
@@ -191,14 +203,14 @@ export default function App() {
     } catch {
       setResult('Error')
     }
-  }, [expression, mathScope, formatResult, playClick])
+  }, [expression, mathScope, formatResult, playClick, settings.calcMode])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.ctrlKey || e.metaKey || e.altKey || isSettingsOpen) return
       const key = e.key
 
-      if (/^[0-9.]$/.test(key)) handleInput(key)
+      if (/^[0-9.xX]$/.test(key)) handleInput(key.toLowerCase())
       else if (['+', '-', '*', '/', '^', '(', ')'].includes(key)) handleInput(key)
       else if (key === '%') {
         e.preventDefault();
@@ -267,20 +279,6 @@ export default function App() {
           --result-text: #ffffff;
         }
 
-        .theme-monochrome {
-          --bg-display: rgba(230, 230, 230, 0.65);
-          --text-main: #111111;
-          --text-muted: #555555;
-          --btn-num: rgba(200, 200, 200, 0.7);
-          --btn-num-hover: rgba(180, 180, 180, 0.9);
-          --btn-func: rgba(180, 180, 180, 0.7);
-          --btn-operator: rgba(150, 150, 150, 0.9);
-          --btn-danger: rgba(100, 100, 100, 0.9);
-          --btn-primary: rgba(50, 50, 50, 0.9);
-          --settings-bg: rgba(240, 240, 240, 0.95);
-          --result-text: #111111;
-        }
-
         body {
           margin: 0;
           background-color: transparent;
@@ -325,7 +323,6 @@ export default function App() {
           transition: color 0.2s ease, transform 0.3s ease;
         }
         .gear-btn:hover { color: var(--text-main); transform: rotate(45deg); }
-        .theme-monochrome .gear-btn:hover { color: #e81123; }
 
         .window-controls { display: flex; -webkit-app-region: no-drag; }
         .win-btn {
@@ -336,8 +333,9 @@ export default function App() {
         .win-btn.close:hover { background-color: #e81123; color: white; border-top-right-radius: 11px; }
 
         .calculator-container {
-          display: flex; flex-direction: column; height: 100vh;
+          display: flex; height: 100vh;
           padding: 0.75rem; padding-top: 2.5rem; box-sizing: border-box;
+          transition: all 0.3s ease;
         }
 
         .display {
@@ -348,7 +346,7 @@ export default function App() {
           flex-shrink: 0;
         }
 
-        .expression { font-size: 1.1rem; min-height: 1.3rem; margin-bottom: 0.25rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+        .expression { font-size: 1.1rem; min-height: 1.3rem; margin-bottom: 0.25rem; font-family: 'JetBrains Mono', monospace; font-weight: 500; width: 100%; text-align: right; }
         .token-default { color: var(--text-muted); }
         .token-func-text { color: var(--btn-primary); }
         .token-num-text { color: var(--text-main); }
@@ -364,9 +362,7 @@ export default function App() {
           transition: font-size 0.2s ease;
         }
 
-        .result.programmer {
-          font-size: 1.6rem;
-        }
+        .result.programmer { font-size: 1.6rem; }
 
         .bases-container {
           display: flex;
@@ -409,13 +405,12 @@ export default function App() {
         .danger { background-color: var(--btn-danger); color: #111; font-weight: 700; }
         .primary { background-color: var(--btn-primary); color: #111; font-weight: 700; }
 
-        /* Updated Overlay: Tighter padding + Custom Scrollbar */
         .settings-overlay {
           position: absolute; top: 32px; left: 0; right: 0; bottom: 0;
           background-color: var(--settings-bg); backdrop-filter: blur(12px);
           z-index: 50; display: flex; flex-direction: column;
-          padding: 1rem 1.25rem; /* Tighter padding pulls content higher */
-          overflow-y: auto; /* Dynamic native scrollbar if needed */
+          padding: 1rem 1.25rem;
+          overflow-y: auto;
           transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
         }
@@ -424,7 +419,6 @@ export default function App() {
         .settings-overlay::-webkit-scrollbar { width: 6px; }
         .settings-overlay::-webkit-scrollbar-track { background: transparent; }
         .settings-overlay::-webkit-scrollbar-thumb { background: var(--btn-func); border-radius: 6px; }
-        .settings-overlay::-webkit-scrollbar-thumb:hover { background: var(--btn-func-hover); }
 
         .settings-header {
           font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-main);
@@ -485,7 +479,6 @@ export default function App() {
           </button>
         </div>
 
-
         <div className="setting-group">
           <span className="setting-label">Calculator Mode</span>
           <div className="setting-controls">
@@ -494,6 +487,9 @@ export default function App() {
             </button>
             <button className={`toggle-btn ${settings.calcMode === 'programmer' ? 'active' : ''}`}
                     onClick={() => setSettings({...settings, calcMode: 'programmer'})}>Programmer
+            </button>
+            <button className={`toggle-btn ${settings.calcMode === 'graphing' ? 'active' : ''}`}
+                    onClick={() => setSettings({...settings, calcMode: 'graphing'})}>Graphing
             </button>
           </div>
         </div>
@@ -534,9 +530,6 @@ export default function App() {
             <button className={`toggle-btn ${settings.theme === 'neon' ? 'active' : ''}`}
                     onClick={() => setSettings({...settings, theme: 'neon'})}>Neon
             </button>
-            <button className={`toggle-btn ${settings.theme === 'monochrome' ? 'active' : ''}`}
-                    onClick={() => setSettings({...settings, theme: 'monochrome'})}>Mono
-            </button>
           </div>
         </div>
         <div className="setting-group">
@@ -549,19 +542,28 @@ export default function App() {
                     onClick={() => setSettings({...settings, onClose: settings.onClose === 'hide' ? 'quit' : 'hide'})}>
               {settings.onClose === 'hide' ? 'Tray Mode' : 'Quit on X'}
             </button>
-
             <button
               className="toggle-btn"
               style={{
                 backgroundColor: settings.colorMode === 'dark' ? 'rgba(255, 204, 0, 0.1)' : 'rgba(100, 150, 255, 0.15)',
                 borderColor: settings.colorMode === 'dark' ? 'rgba(255, 204, 0, 0.6)' : 'rgba(100, 150, 255, 0.6)',
                 color: settings.colorMode === 'dark' ? '#ffcc00' : '#0055ff',
-                fontWeight: 600,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: '1.4',
+                padding: '0.3rem',
                 transition: 'all 0.3s ease'
               }}
               onClick={() => setSettings({...settings, colorMode: settings.colorMode === 'dark' ? 'light' : 'dark'})}
             >
-              {settings.colorMode === 'dark' ? '☀️ Switch to Light' : '🌙 Switch to Dark'}
+              <span style={{fontSize: '0.65rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px'}}>
+                Mode: {settings.colorMode}
+              </span>
+              <span style={{fontWeight: 600, fontSize: '0.9rem'}}>
+                {settings.colorMode === 'dark' ? '☀️ Switch to Light' : '🌙 Switch to Dark'}
+              </span>
             </button>
           </div>
         </div>
@@ -579,72 +581,107 @@ export default function App() {
 
           <div className="settings-footer" style={{
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: 'center',
             marginTop: '1rem',
             color: 'var(--text-muted)'
           }}>
             <span style={{fontWeight: 'bold'}}>v{__APP_VERSION__}</span>
           </div>
-
         </div>
       </div>
 
+      <div className="calculator-container" onClick={() => isSettingsOpen && setIsSettingsOpen(false)}
+           style={{flexDirection: settings.calcMode === 'graphing' ? 'row' : 'column'}}>
 
-      <div className="calculator-container" onClick={() => isSettingsOpen && setIsSettingsOpen(false)}>
-        <div className="display">
-          <HighlightedExpression expression={expression}/>
-          <div className={`result ${settings.calcMode === 'programmer' ? 'programmer' : ''}`}>{result}</div>
+        {/* Left Side: Standard Calculator */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          width: settings.calcMode === 'graphing' ? '336px' : '100%',
+          flexShrink: 0,
+          transition: 'width 0.3s ease'
+        }}>
+          <div className="display" style={{height: 'auto'}}>
+            <HighlightedExpression expression={expression}/>
 
-          {settings.calcMode === 'programmer' && (
-            <div className="bases-container">
-              <div className="base-row"><span className="base-label">HEX</span><span
-                className="base-value">{programmerBases.hex}</span></div>
-              <div className="base-row"><span className="base-label">DEC</span><span
-                className="base-value">{programmerBases.dec}</span></div>
-              <div className="base-row"><span className="base-label">OCT</span><span
-                className="base-value">{programmerBases.oct}</span></div>
-              <div className="base-row"><span className="base-label">BIN</span><span
-                className="base-value">{programmerBases.bin}</span></div>
-            </div>
-          )}
+            {settings.calcMode !== 'graphing' && (
+              <div className={`result ${settings.calcMode === 'programmer' ? 'programmer' : ''}`}>{result}</div>
+            )}
+
+            {settings.calcMode === 'programmer' && (
+              <div className="bases-container">
+                <div className="base-row"><span className="base-label">HEX</span><span
+                  className="base-value">{programmerBases.hex}</span></div>
+                <div className="base-row"><span className="base-label">DEC</span><span
+                  className="base-value">{programmerBases.dec}</span></div>
+                <div className="base-row"><span className="base-label">OCT</span><span
+                  className="base-value">{programmerBases.oct}</span></div>
+                <div className="base-row"><span className="base-label">BIN</span><span
+                  className="base-value">{programmerBases.bin}</span></div>
+              </div>
+            )}
+          </div>
+
+          <div className="keypad">
+            <button onClick={() => handleInput('sin(')} className="btn func" style={{gridArea: 'sin'}}>sin</button>
+            <button onClick={() => handleInput('cos(')} className="btn func" style={{gridArea: 'cos'}}>cos</button>
+            <button onClick={() => handleInput('tan(')} className="btn func" style={{gridArea: 'tan'}}>tan</button>
+            <button onClick={() => handleInput('pi')} className="btn func" style={{gridArea: 'pi'}}>π</button>
+            <button onClick={clear} className="btn danger" style={{gridArea: 'ac'}}>AC</button>
+            <button onClick={() => handleInput('asin(')} className="btn func" style={{gridArea: 'asin'}}>asin</button>
+            <button onClick={() => handleInput('acos(')} className="btn func" style={{gridArea: 'acos'}}>acos</button>
+            <button onClick={() => handleInput('atan(')} className="btn func" style={{gridArea: 'atan'}}>atan</button>
+
+            {settings.calcMode === 'graphing' ? (
+              <button onClick={() => handleInput('x')} className="btn func" style={{gridArea: 'e'}}>x</button>
+            ) : (
+              <button onClick={() => handleInput('e')} className="btn func" style={{gridArea: 'e'}}>e</button>
+            )}
+
+            <button onClick={deleteLast} className="btn danger" style={{gridArea: 'del'}}>DEL</button>
+            <button onClick={() => handleInput('^')} className="btn func" style={{gridArea: 'pow'}}>x^y</button>
+            <button onClick={() => handleInput('sqrt(')} className="btn func" style={{gridArea: 'sqrt'}}>√</button>
+            <button onClick={() => handleInput('log(')} className="btn func" style={{gridArea: 'log'}}>log</button>
+            <button onClick={() => handleInput('(')} className="btn operator" style={{gridArea: 'oparen'}}>(</button>
+            <button onClick={() => handleInput(')')} className="btn operator" style={{gridArea: 'cparen'}}>)</button>
+            <button onClick={() => handleInput('7')} className="btn num" style={{gridArea: 'n7'}}>7</button>
+            <button onClick={() => handleInput('8')} className="btn num" style={{gridArea: 'n8'}}>8</button>
+            <button onClick={() => handleInput('9')} className="btn num" style={{gridArea: 'n9'}}>9</button>
+            <button onClick={() => handleInput('/')} className="btn operator" style={{gridArea: 'div'}}>÷</button>
+            <button onClick={handlePercentage} className="btn operator" style={{gridArea: 'mod'}}>%</button>
+            <button onClick={() => handleInput('4')} className="btn num" style={{gridArea: 'n4'}}>4</button>
+            <button onClick={() => handleInput('5')} className="btn num" style={{gridArea: 'n5'}}>5</button>
+            <button onClick={() => handleInput('6')} className="btn num" style={{gridArea: 'n6'}}>6</button>
+            <button onClick={() => handleInput('*')} className="btn operator" style={{gridArea: 'mul'}}>×</button>
+            <button onClick={() => handleInput('!')} className="btn func" style={{gridArea: 'fact'}}>n!</button>
+            <button onClick={() => handleInput('1')} className="btn num" style={{gridArea: 'n1'}}>1</button>
+            <button onClick={() => handleInput('2')} className="btn num" style={{gridArea: 'n2'}}>2</button>
+            <button onClick={() => handleInput('3')} className="btn num" style={{gridArea: 'n3'}}>3</button>
+            <button onClick={() => handleInput('-')} className="btn operator" style={{gridArea: 'sub'}}>−</button>
+            <button onClick={calculate} className="btn primary" style={{gridArea: 'eq'}}>=</button>
+            <button onClick={() => handleInput('0')} className="btn num" style={{gridArea: 'n0'}}>0</button>
+            <button onClick={() => handleInput('.')} className="btn num" style={{gridArea: 'dot'}}>.</button>
+            <button onClick={() => handleInput('+')} className="btn operator" style={{gridArea: 'add'}}>+</button>
+          </div>
         </div>
-        <div className="keypad">
-          <button onClick={() => handleInput('sin(')} className="btn func" style={{gridArea: 'sin'}}>sin</button>
-          <button onClick={() => handleInput('cos(')} className="btn func" style={{gridArea: 'cos'}}>cos</button>
-          <button onClick={() => handleInput('tan(')} className="btn func" style={{gridArea: 'tan'}}>tan</button>
-          <button onClick={() => handleInput('pi')} className="btn func" style={{gridArea: 'pi'}}>π</button>
-          <button onClick={clear} className="btn danger" style={{gridArea: 'ac'}}>AC</button>
-          <button onClick={() => handleInput('asin(')} className="btn func" style={{gridArea: 'asin'}}>asin</button>
-          <button onClick={() => handleInput('acos(')} className="btn func" style={{gridArea: 'acos'}}>acos</button>
-          <button onClick={() => handleInput('atan(')} className="btn func" style={{gridArea: 'atan'}}>atan</button>
-          <button onClick={() => handleInput('e')} className="btn func" style={{gridArea: 'e'}}>e</button>
-          <button onClick={deleteLast} className="btn danger" style={{gridArea: 'del'}}>DEL</button>
-          <button onClick={() => handleInput('^')} className="btn func" style={{gridArea: 'pow'}}>x^y</button>
-          <button onClick={() => handleInput('sqrt(')} className="btn func" style={{gridArea: 'sqrt'}}>√</button>
-          <button onClick={() => handleInput('log(')} className="btn func" style={{gridArea: 'log'}}>log</button>
-          <button onClick={() => handleInput('(')} className="btn operator" style={{gridArea: 'oparen'}}>(</button>
-          <button onClick={() => handleInput(')')} className="btn operator" style={{gridArea: 'cparen'}}>)</button>
-          <button onClick={() => handleInput('7')} className="btn num" style={{gridArea: 'n7'}}>7</button>
-          <button onClick={() => handleInput('8')} className="btn num" style={{gridArea: 'n8'}}>8</button>
-          <button onClick={() => handleInput('9')} className="btn num" style={{gridArea: 'n9'}}>9</button>
-          <button onClick={() => handleInput('/')} className="btn operator" style={{gridArea: 'div'}}>÷</button>
-          <button onClick={handlePercentage} className="btn operator" style={{gridArea: 'mod'}}>%</button>
-          <button onClick={() => handleInput('4')} className="btn num" style={{gridArea: 'n4'}}>4</button>
-          <button onClick={() => handleInput('5')} className="btn num" style={{gridArea: 'n5'}}>5</button>
-          <button onClick={() => handleInput('6')} className="btn num" style={{gridArea: 'n6'}}>6</button>
-          <button onClick={() => handleInput('*')} className="btn operator" style={{gridArea: 'mul'}}>×</button>
-          <button onClick={() => handleInput('!')} className="btn func" style={{gridArea: 'fact'}}>n!</button>
-          <button onClick={() => handleInput('1')} className="btn num" style={{gridArea: 'n1'}}>1</button>
-          <button onClick={() => handleInput('2')} className="btn num" style={{gridArea: 'n2'}}>2</button>
-          <button onClick={() => handleInput('3')} className="btn num" style={{gridArea: 'n3'}}>3</button>
-          <button onClick={() => handleInput('-')} className="btn operator" style={{gridArea: 'sub'}}>−</button>
-          <button onClick={calculate} className="btn primary" style={{gridArea: 'eq'}}>=</button>
-          <button onClick={() => handleInput('0')} className="btn num" style={{gridArea: 'n0'}}>0</button>
-          <button onClick={() => handleInput('.')} className="btn num" style={{gridArea: 'dot'}}>.</button>
-          <button onClick={() => handleInput('+')} className="btn operator" style={{gridArea: 'add'}}>+</button>
-        </div>
+
+        {/* Right Side: Expanding Graph Panel */}
+        {settings.calcMode === 'graphing' && (
+          <div style={{
+            flexGrow: 1,
+            marginLeft: '0.75rem',
+            display: 'flex',
+            backgroundColor: 'var(--bg-display)',
+            borderRadius: '10px',
+            backdropFilter: 'blur(8px)',
+            overflow: 'hidden'
+          }}>
+            <GraphDisplay expression={expression} colorMode={settings.colorMode}/>
+          </div>
+        )}
+
       </div>
     </div>
   )
 }
-
