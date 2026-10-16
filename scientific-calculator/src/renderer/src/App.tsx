@@ -2,6 +2,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react'
 import * as math from 'mathjs'
 import GraphDisplay from './components/GraphDisplay'
+import MatrixPanel from './components/MatrixPanel'
 
 declare global {
   interface Window {
@@ -22,7 +23,7 @@ interface AppSettings {
   sound: boolean
   onClose: 'hide' | 'quit'
   ghostMode: boolean
-  calcMode: 'scientific' | 'programmer' | 'graphing'
+  calcMode: 'scientific' | 'programmer' | 'graphing' | 'matrix'
   colorMode: 'dark' | 'light'
 }
 
@@ -87,10 +88,10 @@ export default function App() {
     }
   }, [settings.colorMode])
 
-  // NEW: Triggers window resize when graphing mode is toggled
   useEffect(() => {
     if (window.electron) {
-      const newWidth = settings.calcMode === 'graphing' ? 800 : 360
+      const isExpanded = settings.calcMode === 'graphing' || settings.calcMode === 'matrix'
+      const newWidth = isExpanded ? 800 : 360
       window.electron.ipcRenderer.send('resize-window', newWidth)
     }
   }, [settings.calcMode])
@@ -156,7 +157,7 @@ export default function App() {
 
   const calculate = useCallback((): void => {
     playClick()
-    if (settings.calcMode === 'graphing') return
+    if (settings.calcMode === 'graphing' || settings.calcMode === 'matrix') return
 
     try {
       if (!expression) {
@@ -172,7 +173,7 @@ export default function App() {
 
   const handlePercentage = useCallback((): void => {
     playClick()
-    if (settings.calcMode === 'graphing' || !expression) return
+    if (settings.calcMode === 'graphing' || settings.calcMode === 'matrix' || !expression) return
 
     try {
       const match = expression.match(/^(.*?)([\+\-\*\/])([0-9.]+)$/)
@@ -213,10 +214,10 @@ export default function App() {
       if (/^[0-9.xX]$/.test(key)) handleInput(key.toLowerCase())
       else if (['+', '-', '*', '/', '^', '(', ')'].includes(key)) handleInput(key)
       else if (key === '%') {
-        e.preventDefault();
+        e.preventDefault()
         handlePercentage()
       } else if (key === 'Enter' || key === '=') {
-        e.preventDefault();
+        e.preventDefault()
         calculate()
       } else if (key === 'Backspace') deleteLast()
       else if (key === 'Escape') clear()
@@ -247,6 +248,7 @@ export default function App() {
   }, [result])
 
   const themeClasses = `theme-${settings.theme}`
+  const isExpandedView = settings.calcMode === 'graphing' || settings.calcMode === 'matrix'
 
   return (
     <div className={`app-wrapper ${themeClasses}`}>
@@ -440,7 +442,7 @@ export default function App() {
 
         .toggle-btn {
           flex: 1; padding: 0.5rem; background: var(--btn-num); border: 1px solid transparent;
-          color: var(--text-main); border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+          color: var(--text-main); border-radius: 6px; cursor: pointer; font-size: 0.85rem;
         }
         .toggle-btn.active { background: var(--btn-func); border-color: var(--btn-operator); color: var(--btn-primary); font-weight: 600; }
       `}</style>
@@ -490,6 +492,9 @@ export default function App() {
             </button>
             <button className={`toggle-btn ${settings.calcMode === 'graphing' ? 'active' : ''}`}
                     onClick={() => setSettings({...settings, calcMode: 'graphing'})}>Graphing
+            </button>
+            <button className={`toggle-btn ${settings.calcMode === 'matrix' ? 'active' : ''}`}
+                    onClick={() => setSettings({...settings, calcMode: 'matrix'})}>Matrix
             </button>
           </div>
         </div>
@@ -591,21 +596,21 @@ export default function App() {
       </div>
 
       <div className="calculator-container" onClick={() => isSettingsOpen && setIsSettingsOpen(false)}
-           style={{flexDirection: settings.calcMode === 'graphing' ? 'row' : 'column'}}>
+           style={{flexDirection: isExpandedView ? 'row' : 'column'}}>
 
         {/* Left Side: Standard Calculator */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
-          width: settings.calcMode === 'graphing' ? '336px' : '100%',
+          width: isExpandedView ? '336px' : '100%',
           flexShrink: 0,
           transition: 'width 0.3s ease'
         }}>
           <div className="display" style={{height: 'auto'}}>
             <HighlightedExpression expression={expression}/>
 
-            {settings.calcMode !== 'graphing' && (
+            {settings.calcMode !== 'graphing' && settings.calcMode !== 'matrix' && (
               <div className={`result ${settings.calcMode === 'programmer' ? 'programmer' : ''}`}>{result}</div>
             )}
 
@@ -666,7 +671,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right Side: Expanding Graph Panel */}
+        {/* Right Side: Graphing Panel */}
         {settings.calcMode === 'graphing' && (
           <div style={{
             flexGrow: 1,
@@ -678,6 +683,21 @@ export default function App() {
             overflow: 'hidden'
           }}>
             <GraphDisplay expression={expression} colorMode={settings.colorMode}/>
+          </div>
+        )}
+
+        {/* Right Side: Matrix Panel */}
+        {settings.calcMode === 'matrix' && (
+          <div style={{
+            flexGrow: 1,
+            marginLeft: '0.75rem',
+            display: 'flex',
+            backgroundColor: 'var(--bg-display)',
+            borderRadius: '10px',
+            backdropFilter: 'blur(8px)',
+            overflow: 'hidden'
+          }}>
+            <MatrixPanel colorMode={settings.colorMode}/>
           </div>
         )}
 
