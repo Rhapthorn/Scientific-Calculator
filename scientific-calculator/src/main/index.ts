@@ -1,5 +1,5 @@
 // src/main/index.ts
-import {app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray, nativeTheme} from 'electron'
+import {app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, shell, Tray} from 'electron'
 import {join} from 'path'
 import {electronApp, is, optimizer} from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -93,7 +93,7 @@ if (!gotTheLock) {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (win) {
         const bounds = win.getBounds()
-        win.setBounds({ x: bounds.x, y: bounds.y, width: width, height: bounds.height }, true)
+        win.setBounds({x: bounds.x, y: bounds.y, width: width, height: bounds.height}, true)
       }
     })
 
