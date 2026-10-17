@@ -44,3 +44,11 @@ Make sure you have [Node.js](https://nodejs.org/) installed on your machine.
 2. Install the dependencies:
    ```bash
    npm install
+
+## 🔮 Upcoming Features (v2.5.0 Roadmap)
+*   **Exportable Ticket Logs:** One-click export of the history tape to a formatted Markdown snippet, making it effortless to paste subnet boundaries or infrastructure math directly into support tickets.
+*   **Network & Ping Utilities:** Integrating Node.js native child processes to allow the Dev/IT panel to execute raw ping or traceroute commands directly from the calculator UI.
+*   **Floating Widgets:** Deep dive into data unit conversions (Bytes/MB/GB), subnetting, and color values.
+*   **Timezone & Currency Panel:** A dedicated module for live currency exchange rates and international timezone translation.
+*   **JSON & JWT Developer Tools:** A lightweight tab to instantly format/validate JSON payloads or decode JWT tokens without needing to open a browser tab during API development.
+---
