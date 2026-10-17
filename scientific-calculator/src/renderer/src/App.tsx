@@ -3,6 +3,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react'
 import * as math from 'mathjs'
 import GraphDisplay from './components/GraphDisplay'
 import MatrixPanel from './components/MatrixPanel'
+import ConversionsPanel from './components/ConversionsPanel'
 
 declare global {
   interface Window {
@@ -23,8 +24,13 @@ interface AppSettings {
   sound: boolean
   onClose: 'hide' | 'quit'
   ghostMode: boolean
-  calcMode: 'scientific' | 'programmer' | 'graphing' | 'matrix'
+  calcMode: 'scientific' | 'programmer' | 'graphing' | 'matrix' | 'conversions'
   colorMode: 'dark' | 'light'
+}
+
+interface HistoryItem {
+  expr: string
+  res: string
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -62,15 +68,25 @@ export default function App() {
   const [expression, setExpression] = useState<string>('')
   const [result, setResult] = useState<string>('0')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
 
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('calc-settings')
     return saved ? {...DEFAULT_SETTINGS, ...JSON.parse(saved)} : DEFAULT_SETTINGS
   })
 
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    const saved = localStorage.getItem('calc-history')
+    return saved ? JSON.parse(saved) : []
+  })
+
   useEffect(() => {
     localStorage.setItem('calc-settings', JSON.stringify(settings))
   }, [settings])
+
+  useEffect(() => {
+    localStorage.setItem('calc-history', JSON.stringify(history))
+  }, [history])
 
   useEffect(() => {
     window.api.setGhostMode(settings.ghostMode)
@@ -90,7 +106,7 @@ export default function App() {
 
   useEffect(() => {
     if (window.electron) {
-      const isExpanded = settings.calcMode === 'graphing' || settings.calcMode === 'matrix'
+      const isExpanded = settings.calcMode === 'graphing' || settings.calcMode === 'matrix' || settings.calcMode === 'conversions'
       const newWidth = isExpanded ? 800 : 360
       window.electron.ipcRenderer.send('resize-window', newWidth)
     }
@@ -157,7 +173,7 @@ export default function App() {
 
   const calculate = useCallback((): void => {
     playClick()
-    if (settings.calcMode === 'graphing' || settings.calcMode === 'matrix') return
+    if (settings.calcMode === 'graphing' || settings.calcMode === 'matrix' || settings.calcMode === 'conversions') return
 
     try {
       if (!expression) {
@@ -165,7 +181,14 @@ export default function App() {
         return
       }
       const evaluated = math.evaluate(expression, mathScope)
-      setResult(String(formatResult(evaluated)))
+      const finalRes = String(formatResult(evaluated))
+      setResult(finalRes)
+
+      setHistory(prev => {
+        if (prev.length > 0 && prev[0].expr === expression) return prev
+        return [{expr: expression, res: finalRes}, ...prev].slice(0, 20)
+      })
+
     } catch {
       setResult('Error')
     }
@@ -173,7 +196,7 @@ export default function App() {
 
   const handlePercentage = useCallback((): void => {
     playClick()
-    if (settings.calcMode === 'graphing' || settings.calcMode === 'matrix' || !expression) return
+    if (settings.calcMode === 'graphing' || settings.calcMode === 'matrix' || settings.calcMode === 'conversions' || !expression) return
 
     try {
       const match = expression.match(/^(.*?)([\+\-\*\/])([0-9.]+)$/)
@@ -206,9 +229,21 @@ export default function App() {
     }
   }, [expression, mathScope, formatResult, playClick, settings.calcMode])
 
+  const restoreHistory = (item: HistoryItem) => {
+    playClick()
+    setExpression(item.expr)
+    setResult(item.res)
+    setIsHistoryOpen(false)
+  }
+
+  const clearHistory = () => {
+    setHistory([])
+    localStorage.removeItem('calc-history')
+  }
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.ctrlKey || e.metaKey || e.altKey || isSettingsOpen) return
+      if (e.ctrlKey || e.metaKey || e.altKey || isSettingsOpen || isHistoryOpen) return
       const key = e.key
 
       if (/^[0-9.xX]$/.test(key)) handleInput(key.toLowerCase())
@@ -225,7 +260,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleInput, calculate, handlePercentage, deleteLast, clear, isSettingsOpen])
+  }, [handleInput, calculate, handlePercentage, deleteLast, clear, isSettingsOpen, isHistoryOpen])
 
   const handleMinimize = () => window.api.minimizeApp()
   const handleClose = () => window.api.closeApp(settings.onClose)
@@ -248,7 +283,7 @@ export default function App() {
   }, [result])
 
   const themeClasses = `theme-${settings.theme}`
-  const isExpandedView = settings.calcMode === 'graphing' || settings.calcMode === 'matrix'
+  const isExpandedView = settings.calcMode === 'graphing' || settings.calcMode === 'matrix' || settings.calcMode === 'conversions'
 
   return (
     <div className={`app-wrapper ${themeClasses}`}>
@@ -313,8 +348,13 @@ export default function App() {
           z-index: 100;
         }
 
-        .gear-btn {
+        .titlebar-left {
+          display: flex;
+          align-items: center;
           -webkit-app-region: no-drag;
+        }
+
+        .icon-btn {
           background: transparent;
           border: none;
           color: var(--text-muted);
@@ -322,9 +362,12 @@ export default function App() {
           margin-left: 10px;
           display: flex;
           align-items: center;
+          justify-content: center;
           transition: color 0.2s ease, transform 0.3s ease;
+          padding: 4px;
         }
-        .gear-btn:hover { color: var(--text-main); transform: rotate(45deg); }
+        .icon-btn:hover { color: var(--text-main); }
+        .icon-btn.spin:hover { transform: rotate(45deg); }
 
         .window-controls { display: flex; -webkit-app-region: no-drag; }
         .win-btn {
@@ -407,55 +450,92 @@ export default function App() {
         .danger { background-color: var(--btn-danger); color: #111; font-weight: 700; }
         .primary { background-color: var(--btn-primary); color: #111; font-weight: 700; }
 
-        .settings-overlay {
-          position: absolute; top: 32px; left: 0; right: 0; bottom: 0;
+        /* OVERLAYS */
+        .overlay-panel {
+          position: absolute; top: 32px; bottom: 0;
           background-color: var(--settings-bg); backdrop-filter: blur(12px);
           z-index: 50; display: flex; flex-direction: column;
-          padding: 1rem 1.25rem;
-          overflow-y: auto;
-          transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-          border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+          overflow-y: auto; transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .overlay-panel::-webkit-scrollbar { width: 6px; }
+        .overlay-panel::-webkit-scrollbar-track { background: transparent; }
+        .overlay-panel::-webkit-scrollbar-thumb { background: var(--btn-func); border-radius: 6px; }
+
+        .settings-overlay {
+          left: 0; right: 0; padding: 1rem 1.25rem;
+          transform: translateY(100%); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
         }
         .settings-overlay.open { transform: translateY(0); }
 
-        .settings-overlay::-webkit-scrollbar { width: 6px; }
-        .settings-overlay::-webkit-scrollbar-track { background: transparent; }
-        .settings-overlay::-webkit-scrollbar-thumb { background: var(--btn-func); border-radius: 6px; }
+        .history-overlay {
+          right: 0; width: 280px; padding: 1rem;
+          transform: translateX(100%); border-bottom-right-radius: 12px;
+          border-left: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .history-overlay.open { transform: translateX(0); }
 
-        .settings-header {
+        .overlay-header {
           font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-main);
           display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
         }
 
-        .close-settings-btn {
+        .close-overlay-btn {
           background: transparent; border: none; color: var(--text-muted); cursor: pointer;
           display: flex; align-items: center; justify-content: center; padding: 0.25rem;
           transition: color 0.2s ease, transform 0.2s ease;
         }
-        .close-settings-btn:hover {
-          color: var(--btn-danger); transform: scale(1.1);
+        .close-overlay-btn:hover { color: var(--btn-danger); transform: scale(1.1); }
+
+        /* HISTORY SPECIFIC */
+        .history-list {
+          display: flex; flex-direction: column; gap: 0.5rem;
         }
+        .history-item {
+          background: var(--bg-display); padding: 0.75rem; border-radius: 8px;
+          cursor: pointer; transition: background 0.2s; text-align: right;
+        }
+        .history-item:hover { background: var(--btn-num-hover); }
+        .history-expr { font-size: 0.9rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 0.2rem; }
+        .history-res { font-size: 1.2rem; font-weight: 600; color: var(--result-text); }
+        .no-history { text-align: center; color: var(--text-muted); margin-top: 2rem; font-size: 0.9rem; }
 
         .setting-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
         .setting-label { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-        .setting-controls { display: flex; gap: 0.5rem; }
+        .setting-controls { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
         .toggle-btn {
-          flex: 1; padding: 0.5rem; background: var(--btn-num); border: 1px solid transparent;
+          flex: 1; min-width: 60px; padding: 0.5rem; background: var(--btn-num); border: 1px solid transparent;
           color: var(--text-main); border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+          text-align: center;
         }
         .toggle-btn.active { background: var(--btn-func); border-color: var(--btn-operator); color: var(--btn-primary); font-weight: 600; }
       `}</style>
 
       <div className="titlebar">
-        <button className="gear-btn" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-               strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
+        <div className="titlebar-left">
+          <button className="icon-btn spin" onClick={() => {
+            setIsSettingsOpen(!isSettingsOpen);
+            setIsHistoryOpen(false);
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                 strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+          <button className="icon-btn" onClick={() => {
+            setIsHistoryOpen(!isHistoryOpen);
+            setIsSettingsOpen(false);
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                 strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="12 8 12 12 14 14"></polyline>
+              <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"></path>
+            </svg>
+          </button>
+        </div>
         <div className="window-controls">
           <button className="win-btn" onClick={handleMinimize}>
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor">
@@ -470,10 +550,10 @@ export default function App() {
         </div>
       </div>
 
-      <div className={`settings-overlay ${isSettingsOpen ? 'open' : ''}`}>
-        <div className="settings-header">
+      <div className={`overlay-panel settings-overlay ${isSettingsOpen ? 'open' : ''}`}>
+        <div className="overlay-header">
           <span>Preferences</span>
-          <button className="close-settings-btn" onClick={() => setIsSettingsOpen(false)}>
+          <button className="close-overlay-btn" onClick={() => setIsSettingsOpen(false)}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"
                  strokeLinecap="round" strokeLinejoin="round">
               <path d="M1 1L13 13M13 1L1 13"/>
@@ -483,7 +563,7 @@ export default function App() {
 
         <div className="setting-group">
           <span className="setting-label">Calculator Mode</span>
-          <div className="setting-controls">
+          <div className="setting-controls" style={{display: 'grid', gridTemplateColumns: '1fr 1fr'}}>
             <button className={`toggle-btn ${settings.calcMode === 'scientific' ? 'active' : ''}`}
                     onClick={() => setSettings({...settings, calcMode: 'scientific'})}>Scientific
             </button>
@@ -495,6 +575,10 @@ export default function App() {
             </button>
             <button className={`toggle-btn ${settings.calcMode === 'matrix' ? 'active' : ''}`}
                     onClick={() => setSettings({...settings, calcMode: 'matrix'})}>Matrix
+            </button>
+            <button className={`toggle-btn ${settings.calcMode === 'conversions' ? 'active' : ''}`}
+                    style={{gridColumn: 'span 2'}}
+                    onClick={() => setSettings({...settings, calcMode: 'conversions'})}>Dev/IT
             </button>
           </div>
         </div>
@@ -583,20 +667,42 @@ export default function App() {
           flexShrink: 0
         }}>
           Ghost Mode (Click-Through): <strong>Ctrl+Shift+G</strong>
-
-          <div className="settings-footer" style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginTop: '1rem',
-            color: 'var(--text-muted)'
-          }}>
+          <div className="settings-footer"
+               style={{display: 'flex', justifyContent: 'center', marginTop: '1rem', color: 'var(--text-muted)'}}>
             <span style={{fontWeight: 'bold'}}>v{__APP_VERSION__}</span>
           </div>
         </div>
       </div>
 
-      <div className="calculator-container" onClick={() => isSettingsOpen && setIsSettingsOpen(false)}
-           style={{flexDirection: isExpandedView ? 'row' : 'column'}}>
+      <div className={`overlay-panel history-overlay ${isHistoryOpen ? 'open' : ''}`}>
+        <div className="overlay-header">
+          <span>History</span>
+          <button className="close-overlay-btn" onClick={clearHistory} title="Clear History">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                 strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+        <div className="history-list">
+          {history.length === 0 ? (
+            <div className="no-history">No past calculations</div>
+          ) : (
+            history.map((item, idx) => (
+              <div key={idx} className="history-item" onClick={() => restoreHistory(item)}>
+                <div className="history-expr">{item.expr}</div>
+                <div className="history-res">={item.res}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="calculator-container" onClick={() => {
+        isSettingsOpen && setIsSettingsOpen(false);
+        isHistoryOpen && setIsHistoryOpen(false);
+      }} style={{flexDirection: isExpandedView ? 'row' : 'column'}}>
 
         {/* Left Side: Standard Calculator */}
         <div style={{
@@ -610,7 +716,7 @@ export default function App() {
           <div className="display" style={{height: 'auto'}}>
             <HighlightedExpression expression={expression}/>
 
-            {settings.calcMode !== 'graphing' && settings.calcMode !== 'matrix' && (
+            {settings.calcMode !== 'graphing' && settings.calcMode !== 'matrix' && settings.calcMode !== 'conversions' && (
               <div className={`result ${settings.calcMode === 'programmer' ? 'programmer' : ''}`}>{result}</div>
             )}
 
@@ -698,6 +804,21 @@ export default function App() {
             overflow: 'hidden'
           }}>
             <MatrixPanel colorMode={settings.colorMode}/>
+          </div>
+        )}
+
+        {/* Right Side: Conversions Panel */}
+        {settings.calcMode === 'conversions' && (
+          <div style={{
+            flexGrow: 1,
+            marginLeft: '0.75rem',
+            display: 'flex',
+            backgroundColor: 'var(--bg-display)',
+            borderRadius: '10px',
+            backdropFilter: 'blur(8px)',
+            overflow: 'hidden'
+          }}>
+            <ConversionsPanel colorMode={settings.colorMode}/>
           </div>
         )}
 

@@ -105,10 +105,11 @@ if (!gotTheLock) {
       }
     })
 
-    globalShortcut.register('CommandOrControl+Shift+C', () => {
-      if (mainWindow.isVisible()) {
+    globalShortcut.register('Alt+C', () => {
+      if (mainWindow.isVisible() && mainWindow.isFocused()) {
         mainWindow.hide()
       } else {
+        if (mainWindow.isMinimized()) mainWindow.restore()
         mainWindow.show()
         mainWindow.focus()
       }
@@ -170,6 +171,11 @@ if (!gotTheLock) {
   app.on('before-quit', () => {
     isQuitting = true
   })
+
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll()
+  })
+
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
