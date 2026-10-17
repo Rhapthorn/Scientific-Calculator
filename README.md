@@ -45,6 +45,20 @@ Make sure you have [Node.js](https://nodejs.org/) installed on your machine.
    ```bash
    npm install
 
+   ### Development
+Start the Vite dev server and the Electron app simultaneously:
+```bash
+npm run dev
+```
+
+### Production Build
+To compile the application and generate a standalone Windows installer (`.exe`):
+```bash
+npm run build:win
+```
+The compiled output will be available in the `dist/` directory.
+
+
 ## 🔮 Upcoming Features (v2.5.0 Roadmap)
 *   **Exportable Ticket Logs:** One-click export of the history tape to a formatted Markdown snippet, making it effortless to paste subnet boundaries or infrastructure math directly into support tickets.
 *   **Network & Ping Utilities:** Integrating Node.js native child processes to allow the Dev/IT panel to execute raw ping or traceroute commands directly from the calculator UI.
